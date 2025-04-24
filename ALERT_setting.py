@@ -36,7 +36,7 @@ def set_seed(seed):
 
 
 # Pre-settings
-learning_algorithms = ['LeNet', 'AlexNet', 'VGG', 'GoogLeNet', 'ResNet', 'DenseNet', 'MobileNet', 'RNN', 'CNN+RNN', 'ViT','DeiT', 'RaDA', 'xLSTM']
+learning_algorithms = ['LeNet', 'AlexNet', 'VGG', 'GoogLeNet', 'ResNet', 'DenseNet', 'MobileNet', 'RNN', 'CNN+RNN', 'ViT','DeiT', 'RaDA', 'xLSTM', 'ISAViT']
 cropping_methods = ['cropO', 'cropX', 'CA', 'RD'] 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 subject_list = ['dk', 'jj', 'ks', 'sh', 'wh', 'yj', 'ys', 'yh', 'jp']

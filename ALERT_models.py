@@ -74,6 +74,12 @@ class ConcatModel(nn.Module):
             output = self.vit(features_t, features_f) 
             output = self.classifier(output, None)
             #output = self.classifier(features_t, features_f)
+        elif self.lorv == 'ISAViT':
+            #features_f = features_f * 0.5
+            #features = torch.cat((features_t, features_f), dim=1)
+            output = self.classifier(features_t, features_f) #general case
+            #output = self.classifier(features_t, None) #RD case
+            #output = self.classifier(features_f, None) #single case
         else:
             #output = self.classifier(features_f, None) # For MVL
             output = self.classifier(features_t, features_f)
@@ -415,11 +421,11 @@ class VisionTransformer_deit(nn.Module):
         self.model.head_dist = torch.nn.Identity()
 
     def forward(self, x1, x2):
-        x = x1 # For MVL
-        x = x.repeat(1, 3, 1, 1)# For MVL
-        #x = torch.cat((x1, x2), dim=1) #[B, 2, 244, 244]
-        #third_channel = x.mean(dim=1, keepdim=True)  # Calculate the mean of the two channels
-        #x = torch.cat((x, third_channel), dim=1)
+        #x = x1 # For MVL
+        #x = x.repeat(1, 3, 1, 1)# For MVL
+        x = torch.cat((x1, x2), dim=1) #[B, 2, 244, 244]
+        third_channel = x.mean(dim=1, keepdim=True)  # Calculate the mean of the two channels
+        x = torch.cat((x, third_channel), dim=1)
         x = self.model(x)
         return x  # Class prediction
 
@@ -561,6 +567,150 @@ class xLSTM(nn.Module):
         outputs = torch.cat(outputs, dim=0)
         return outputs, (h_list, c_list)
 
+class VisionTransformer_no_resize_single_domain(nn.Module):
+    def __init__(self): 
+        super().__init__()
+        if setting.pretrained == True:
+            self.model = timm.create_model('vit_large_patch16_224', pretrained=True)
+        else:
+            self.model = timm.create_model('vit_large_patch16_224', pretrained=False)
+        
+        # conv filter weight resizing
+        self.initialized = False
+        self.h_num_padding = None
+        self.w_num_padding = None
+        self.num_patches = None
+        self.patch_side_h = 37
+        self.patch_side_w = 37
+        self.side_h = 504
+        self.side_w = 504
+        self.original_num_patches = self.model.patch_embed.num_patches
+        self.original_hw = int(self.original_num_patches ** 0.5) # 14
+        self.original_embedding_dim = self.model.pos_embed.shape[2]
+        self.original_patch_size = self.model.patch_embed.proj.weight.shape[2]
+
+
+        #projection for time initialization
+        new_proj = torch.nn.Conv2d(1, self.original_embedding_dim, kernel_size=(10, 10), stride=(10, 10))
+        weight_onechannel = torch.sum(self.model.patch_embed.proj.weight, dim=1).unsqueeze(1)
+        new_proj.weight = torch.nn.Parameter(self.patch_avg_pool(10, 10, 10, 10, weight_onechannel))
+        new_proj.bias = self.model.patch_embed.proj.bias
+        self.model.patch_embed.proj = new_proj
+
+        #self.model.patch_embed.strict_img_size = False
+        #self.model.patch_embed.dynamic_img_pad = False
+
+        self.model.head = torch.nn.Identity()#torch.nn.Linear(192, 192)
+        #self.model.head_dist = torch.nn.Identity()
+    
+    def patch_avg_pool(self, patch_size_old_h, patch_size_old_w, patch_size_new_h, patch_size_new_w, patch_weight):
+        if patch_size_old_h >= patch_size_new_h and patch_size_old_w >= patch_size_new_w:
+            k_size_h = patch_size_old_h - patch_size_new_h + 1
+            k_size_w = patch_size_old_w - patch_size_new_w + 1
+            new_patch_weight = F.avg_pool2d(patch_weight, kernel_size = (k_size_h, k_size_w), stride = 1)
+        else: 
+            new_patch_weight = F.interpolate(patch_weight, size=(patch_size_new_h, patch_size_new_w), mode='bilinear', align_corners=False)
+    
+        return new_patch_weight
+
+    def forward(self, x):
+        if not self.initialized:
+            long_side = max(x.shape[2], x.shape[3])
+            self.patch_side_h = int(long_side/14) + 1
+            self.patch_side_w = self.patch_side_h
+            self.side_h = self.patch_side_h * self.original_hw
+            self.side_w = self.patch_side_w * self.original_hw
+            # make patch_embedding and assign the pre-trained weight
+            new_proj = torch.nn.Conv2d(1, self.original_embedding_dim, kernel_size=(self.patch_side_h, self.patch_side_w), stride=(self.patch_side_h, self.patch_side_w))
+            weight_onechannel = torch.sum(self.model.patch_embed.proj.weight, dim=1).unsqueeze(1)
+            new_proj.weight = torch.nn.Parameter(self.patch_avg_pool(self.original_patch_size, self.original_patch_size, self.patch_side_h, self.patch_side_w, weight_onechannel))
+            new_proj.bias = self.model.patch_embed.proj.bias
+            self.model.patch_embed.proj = new_proj
+            
+            #calculation of padding
+            #num_patch_height = int(x.shape[2] / self.patch_side_h) + 1
+            #num_patch_width = int(x.shape[3] / self.patch_side_w) + 1
+            self.num_patches = self.original_num_patches
+            #self.h_num_padding = num_patch_height * self.patch_side_h - x.shape[2]
+            #self.w_num_padding = num_patch_width * self.patch_side_w - x.shape[3]
+            #num_patch_height = 14 #special case
+            #num_patch_width = 14 #special case
+            #self.num_patches = num_patch_height*num_patch_width
+            #self.h_num_padding = 18 #special case
+            #self.w_num_padding = 18 #special case
+            '''
+            #pos_embedding
+            new_pos_embed = self.model.pos_embed[:, 1:, :].detach().reshape(1, self.original_num_patches, self.original_embedding_dim).transpose(1, 2).reshape(1, self.original_embedding_dim, self.original_hw, self.original_hw)
+            # cut (from middle) or interpolate the second dimension of the positional embedding
+            if num_patch_width <= self.original_hw:
+                new_pos_embed = new_pos_embed[:, :, :, int(self.original_hw / 2) - int(num_patch_width / 2): int(self.original_hw / 2) - int(num_patch_width / 2) + num_patch_width]
+            else:
+                new_pos_embed = torch.nn.functional.interpolate(new_pos_embed, size=(self.original_hw, num_patch_width), mode='bilinear')
+            # cut (from middle) or interpolate the first dimension of the positional embedding
+            if num_patch_height <= self.original_hw:
+                new_pos_embed = new_pos_embed[:, :, int(self.original_hw / 2) - int(num_patch_height / 2): int(self.original_hw / 2) - int(num_patch_height / 2) + num_patch_height, :]
+            else:
+                new_pos_embed = torch.nn.functional.interpolate(new_pos_embed, size=(num_patch_height, num_patch_width), mode='bilinear')
+            # flatten the positional embedding
+            new_pos_embed = new_pos_embed.reshape(1, self.original_embedding_dim, self.num_patches).transpose(1,2)
+            # concatenate the above positional embedding with the cls token and distillation token of the deit model.
+            self.model.pos_embed = nn.Parameter(torch.cat([self.model.pos_embed[:, :1, :].detach(), new_pos_embed], dim=1))
+            '''
+            self.initialized = True
+        
+        #0-padding to input
+        x = F.interpolate(x, size=(self.side_h, self.side_w), mode='bilinear', align_corners=False) #self.side_handw must be save 
+        #print(x.shape)
+        '''
+        if self.h_num_padding % 2 == 0:
+            if self.w_num_padding % 2 == 0:
+                x = F.pad(x, (int(self.w_num_padding/2), int(self.w_num_padding/2), int(self.h_num_padding/2), int(self.h_num_padding/2)))
+            else:
+                x = F.pad(x, (int(self.w_num_padding/2), int(self.w_num_padding/2)+1, int(self.h_num_padding/2), int(self.h_num_padding/2)))
+        else:
+            if self.w_num_padding % 2 == 0:
+                x = F.pad(x, (int(self.w_num_padding/2), int(self.w_num_padding/2), int(self.h_num_padding/2), int(self.h_num_padding/2)+1))
+            else:
+                x = F.pad(x, (int(self.w_num_padding/2), int(self.w_num_padding/2)+1, int(self.h_num_padding/2), int(self.h_num_padding/2)+1))
+        '''
+        
+        #x = self.model(x)
+        
+        B = x.shape[0]
+        x = self.model.patch_embed.proj(x)
+        #print(x.shape)
+        x = x.view(B, self.original_embedding_dim, self.num_patches).transpose(1, 2)
+        
+        cls_tokens = self.model.cls_token.expand(B, -1, -1)
+        
+        x = torch.cat((cls_tokens, x), dim=1)
+        x = x + self.model.pos_embed
+        x = self.model.pos_drop(x)
+        for blk in self.model.blocks:
+            x = blk(x)
+        x = self.model.norm(x)
+        x = self.model.head(x)
+        x = x[:, 0]
+        
+        '''
+        B = x.shape[0]
+        x = self.model.patch_embed(x)
+        print(x.shape)
+        cls_tokens = self.model.cls_token.expand(B, -1, -1)
+        #dist_token = self.model.dist_token.expand(B, -1, -1)
+        x = torch.cat((cls_tokens, x), dim=1)
+        print(x.shape)
+        #print(self.model.pos_embed.shape)
+        x = x + self.model.pos_embed
+        x = self.model.pos_drop(x)
+        for blk in self.model.blocks:
+            x = blk(x)
+        x = self.model.norm(x)
+        x = (x[:, 0] + x[:, 1]) / 2
+        '''
+        #x = self.model(x)
+        return x  # Class prediction
+
 ###############################################################################
 # Time Series Feature Extraction Model using xLSTM
 ###############################################################################
@@ -701,6 +851,14 @@ def model_selection(model):
         epochs = 30
         lr = 0.00001 
         criterion = nn.CrossEntropyLoss()
+    elif model == 'ISAViT':
+        base_model_t = VisionTransformer_no_resize_single_domain()
+        base_model_f = MobileNet3()
+        #base_model_f = VisionTransformer_no_resize_single_domain()
+        epochs = 30
+        lr = 0.00001 # original:0.0001 it didnt work, new:0.00001 it works...
+        #lr = 0.0001 # Beta testing
+        criterion = nn.CrossEntropyLoss()
     elif model == 'xLSTM':
         base_model_t = XLSTMTimeSeriesFeatureModel(51, 128, 2, dropout=0.5)
         base_model_f = XLSTMTimeSeriesFeatureModel(89, 128, 2, dropout=0.5)
@@ -720,6 +878,8 @@ def model_selection(model):
         base_model = ConcatModel(base_model_t, base_model_f, classifier, 'DeiT').to(setting.device)
     elif model == 'ViT':
         base_model = ConcatModel(base_model_t, base_model_f, classifier, 'ViT').to(setting.device)
+    elif model == 'ISAViT':        
+        base_model = ConcatModel(base_model_t, base_model_f, classifier, 'ISAViT').to(setting.device)
     elif model == 'xLSTM':
         base_model = ConcatModel(base_model_t, base_model_f, classifier, 'xLSTM').to(setting.device)
 
@@ -750,6 +910,8 @@ def model_selection(model):
         optimizer = optim.Adam(base_model.parameters(), lr=lr)
     elif model == 'ViT':
         optimizer = optim.Adam(base_model.parameters(), lr=lr)#optim.AdamW(base_model.parameters(), lr=lr, weight_decay=0.05) #optim.SGD(base_model.parameters(), lr=lr, momentum=0.9)
+    elif model == 'ISAViT':
+        optimizer = optim.Adam(base_model.parameters(), lr=lr)
     elif model == 'xLSTM':
         optimizer = optim.Adam(base_model.parameters(), lr=lr)
     elif model == 'all':

@@ -362,6 +362,23 @@ if __name__ == "__main__":
         'mini_resnet_t': base_model.base_model_t.mini_ResNet,
         'mini_resnet_f': base_model.base_model_f.mini_ResNet
          }, PATH + model+'_'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(epochs)+'_'+str(N_shot)+'_'+str(adapt_epoch)+'_'+str(exp_iteration)+'_'+memo+'.pt')
+    elif model == 'ISAViT':
+        torch.save({
+        'model_state_dict': base_model.state_dict(),
+        'optimizer_state_dict': optimizer.state_dict(),
+        'learning_rate': [group['lr'] for group in optimizer.param_groups],
+        'output_size': base_model.classifier.output_size,
+        'vit_no_resize_single_domain_model_t': base_model.base_model_t.model,
+        'num_patches_t': base_model.base_model_t.num_patches,
+        'side_h_t' : base_model.base_model_t.side_h,
+        'side_w_t' : base_model.base_model_t.side_w,
+        'beta' : base_model.classifier.beta,
+        'alpha' : base_model.classifier.alpha
+        #'vit_no_resize_single_domain_model_f': base_model.base_model_f.model,
+        #'num_patches_f': base_model.base_model_f.num_patches,
+        #'side_h_f' : base_model.base_model_f.side_h,
+        #'side_w_f' : base_model.base_model_f.side_w
+        }, PATH + model+'_'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(epochs)+'_'+str(N_shot)+'_'+str(adapt_epoch)+'_'+str(exp_iteration)+'_'+memo+'.pt')
     else:
         torch.save({
         'model_state_dict': base_model.state_dict(),
@@ -396,6 +413,19 @@ if __name__ == "__main__":
     elif model == 'RaDA':
         base_model.base_model_t.mini_ResNet = checkpoint['mini_resnet_t']
         base_model.base_model_f.mini_ResNet = checkpoint['mini_resnet_f']
+    elif model == 'ISAViT':
+        base_model.base_model_t.model = checkpoint['vit_no_resize_single_domain_model_t']
+        base_model.base_model_t.num_patches = checkpoint['num_patches_t']     
+        base_model.base_model_t.side_h = checkpoint['side_h_t']     
+        base_model.base_model_t.side_w = checkpoint['side_w_t']  
+        base_model.classifier.beta = checkpoint['beta']
+        base_model.classifier.alpha = checkpoint['alpha']  
+        #base_model.base_model_f.model = checkpoint['vit_no_resize_single_domain_model_f']
+        #base_model.base_model_f.num_patches = checkpoint['num_patches_f']     
+        #base_model.base_model_f.side_h = checkpoint['side_h_f']     
+        #base_model.base_model_f.side_w = checkpoint['side_w_f']   
+        base_model.base_model_t.initialized = True
+        #base_model.base_model_f.initialized = True
     else:
         base_model.classifier.beta = checkpoint['beta']
         base_model.classifier.alpha = checkpoint['alpha'] 
@@ -609,7 +639,7 @@ if __name__ == "__main__":
         #'side_h_f' : base_model.base_model_f.side_h,
         #'side_w_f' : base_model.base_model_f.side_w
         }, PATH + model+'_'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(epochs)+'_'+str(N_shot)+'_'+str(adapt_epoch)+'_'+str(exp_iteration)+'_'+memo+'Beta_Test'+'.pt')          
-    '''
+    '''#Beta training
     
     
     '''
@@ -621,6 +651,10 @@ if __name__ == "__main__":
     base_model.classifier.fc2 = nn.Linear(output_size//2, output_size//4).to(setting.device)
     base_model.classifier.fc3 = nn.Linear(output_size//4, setting.num_classes).to(setting.device)
     base_model.classifier.initialized = True
+    # base_model.base_model_t.model = checkpoint['vit_no_resize_single_domain_model_t']
+    # base_model.base_model_t.num_patches = checkpoint['num_patches_t']     
+    # base_model.base_model_t.side_h = checkpoint['side_h_t']     
+    # base_model.base_model_t.side_w = checkpoint['side_w_t']  
     base_model.classifier.beta = checkpoint['beta']
     base_model.classifier.alpha = checkpoint['alpha']  
     #base_model.base_model_f.model = checkpoint['vit_no_resize_single_domain_model_f']
@@ -687,6 +721,8 @@ if __name__ == "__main__":
     # After adaptation
     if model == 'VGG':
         optimizer = optim.Adam(base_model.parameters(), lr=0.00001) # for VGG
+    elif model == 'ViT_no_resize_single_domain' or model == 'ISAViT':
+        optimizer = optim.Adam(base_model.parameters(), lr=0.00001) 
     #optimizer = optim.Adam(base_model.parameters(), lr=0.00001) # for RaDA
     adapt_dataloader = DataLoader(adapt_dataset, batch_size=5, shuffle=True)
     
@@ -747,6 +783,153 @@ if __name__ == "__main__":
             duration_test += end_test - start_test
     accuracy = 100 * correct / total
     perfromance_eval(confusion_matrix, accuracy, base_model, t_test.shape, f_test.shape, duration_test, PHASE) 
+    
+    # PATH = './checkpoint/'
+    # torch.save({
+    #     'model_state_dict': base_model.state_dict(),
+    #     'optimizer_state_dict': optimizer.state_dict(),
+    #     'learning_rate': [group['lr'] for group in optimizer.param_groups],
+    #     'output_size': base_model.classifier.output_size,
+    #     'vit_no_resize_single_domain_model_t': base_model.base_model_t.model,
+    #     'num_patches_t': base_model.base_model_t.num_patches,
+    #     'side_h_t' : base_model.base_model_t.side_h,
+    #     'side_w_t' : base_model.base_model_t.side_w,
+    #     'beta' : base_model.classifier.beta,
+    #     'alpha' : base_model.classifier.alpha
+    #     #'vit_no_resize_single_domain_model_f': base_model.base_model_f.model,
+    #     #'num_patches_f': base_model.base_model_f.num_patches,
+    #     #'side_h_f' : base_model.base_model_f.side_h,
+    #     #'side_w_f' : base_model.base_model_f.side_w
+    #     }, PATH + model+'_'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(epochs)+'_'+str(N_shot)+'_'+str(adapt_epoch)+'_'+str(exp_iteration)+'_'+memo+'AA'+'.pt')           
+
+
+    """
+    PATH = './checkpoint/'
+    checkpoint = torch.load(PATH + model+'_'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(epochs)+'_'+str(N_shot)+'_'+str(adapt_epoch)+'_'+str(exp_iteration)+'_'+memo+'AA'+'.pt')
+    
+    output_size = checkpoint['output_size']
+    base_model.classifier.fc1 = nn.Linear(output_size, output_size//2).to(setting.device)
+    base_model.classifier.fc2 = nn.Linear(output_size//2, output_size//4).to(setting.device)
+    base_model.classifier.fc3 = nn.Linear(output_size//4, setting.num_classes).to(setting.device)
+    base_model.classifier.initialized = True
+    base_model.base_model_t.model = checkpoint['vit_no_resize_single_domain_model_t']
+    base_model.base_model_t.num_patches = checkpoint['num_patches_t']     
+    base_model.base_model_t.side_h = checkpoint['side_h_t']     
+    base_model.base_model_t.side_w = checkpoint['side_w_t']  
+    base_model.classifier.beta = checkpoint['beta']
+    base_model.classifier.alpha = checkpoint['alpha']  
+    #base_model.base_model_f.model = checkpoint['vit_no_resize_single_domain_model_f']
+    #base_model.base_model_f.num_patches = checkpoint['num_patches_f']     
+    #base_model.base_model_f.side_h = checkpoint['side_h_f']     
+    #base_model.base_model_f.side_w = checkpoint['side_w_f']   
+    base_model.base_model_t.initialized = True
+    #base_model.base_model_f.initialized = True
+    base_model.load_state_dict(checkpoint['model_state_dict'])
+    base_model.classifier.beta = nn.Parameter(torch.tensor(1.0)) # for beta training
+    optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+
+
+    # Testing after adaptation
+    base_model.eval()
+    confusion_matrix = [[0 for i in range(setting.num_classes)] for j in range(setting.num_classes)]
+    correct = 0.0
+    total = 0.0
+    duration_test = 0
+    start_test = time.time()
+    with torch.no_grad():
+        for i, (t_test, f_test, l_test) in enumerate(test_dataloader):
+            t_test, f_test, l_test = t_test.to(setting.device), f_test.to(setting.device), l_test.to(setting.device)
+            ##
+            t_test = t_test.unsqueeze(1)
+            f_test = f_test.unsqueeze(1)
+            ##
+            features, outputs = base_model(t_test.float(), f_test.float())
+            labels_indice = torch.argmax(l_test, dim=1)
+            _, predicted = torch.max(outputs, 1)
+            
+            
+            total += l_test.size(0)
+            for k in range(len(predicted)):
+                confusion_matrix[labels_indice[k]][predicted[k]] += 1
+            correct += (predicted == labels_indice).sum().item()
+            end_test = time.time()
+            duration_test += end_test - start_test
+    accuracy = 100 * correct / total
+    perfromance_eval(confusion_matrix, accuracy, base_model, t_test.shape, f_test.shape, duration_test, 'adapt_test') 
+
+
+    # After adaptation
+    if model == 'VGG':
+        optimizer = optim.Adam(base_model.parameters(), lr=0.00001) # for VGG
+    elif model == 'ViT_no_resize_single_domain' or model == 'ISAViT':
+        optimizer = optim.Adam(base_model.parameters(), lr=0.001) 
+    
+
+    adapt_dataloader = DataLoader(adapt_dataset, batch_size=5, shuffle=True)
+    
+    base_model.train()
+    for param in base_model.parameters():
+        param.requires_grad = False
+    # Unfreeze only the classifier parameters
+    for param in base_model.classifier.parameters():
+        param.requires_grad = True
+    
+
+    feature_dict_adapt_trainer = copy.deepcopy(setting.feature_dict_original)
+    feature_dict_adapt_tester = copy.deepcopy(setting.feature_dict_original)
+    duration_adapt = 0
+    start_adapt = time.time()
+    for epoch in range(50):
+        running_loss = 0.0
+        for step, (t_adapt, f_adapt, l_adapt) in enumerate(adapt_dataloader):
+            t_adapt, f_adapt, l_adapt = t_adapt.to(setting.device), f_adapt.to(setting.device), l_adapt.to(setting.device)
+            ##
+            t_adapt = t_adapt.unsqueeze(1)
+            f_adapt = f_adapt.unsqueeze(1)
+            ##
+            optimizer.zero_grad()
+            labels_indices = torch.argmax(l_adapt, dim=1)
+            features, outputs = base_model(t_adapt.float(), f_adapt.float())
+            
+            loss = criterion(outputs, labels_indices)
+            loss.backward()
+            optimizer.step()
+            running_loss += loss.item()   
+            wandb.log({"Adaptation loss (per iteration)": loss.item()})      
+            end_adapt = time.time()
+            duration_adapt += end_adapt - start_adapt
+    
+    # Testing after adaptation
+    base_model.eval()
+    confusion_matrix = [[0 for i in range(setting.num_classes)] for j in range(setting.num_classes)]
+    correct = 0.0
+    total = 0.0
+    duration_test = 0
+    start_test = time.time()
+    with torch.no_grad():
+        for i, (t_test, f_test, l_test) in enumerate(test_dataloader):
+            t_test, f_test, l_test = t_test.to(setting.device), f_test.to(setting.device), l_test.to(setting.device)
+            ##
+            t_test = t_test.unsqueeze(1)
+            f_test = f_test.unsqueeze(1)
+            ##
+            features, outputs = base_model(t_test.float(), f_test.float())
+            labels_indice = torch.argmax(l_test, dim=1)
+            _, predicted = torch.max(outputs, 1)
+            if epoch == adapt_epoch - 1:
+                features = features.tolist()
+                for feature_idx, labels_idx in enumerate(labels_indice):
+                    feature_dict_adapt_tester[str(int(labels_idx))].append(features[feature_idx])
+            total += l_test.size(0)
+            for k in range(len(predicted)):
+                confusion_matrix[labels_indice[k]][predicted[k]] += 1
+            correct += (predicted == labels_indice).sum().item()
+            end_test = time.time()
+            duration_test += end_test - start_test
+    accuracy = 100 * correct / total
+    perfromance_eval(confusion_matrix, accuracy, base_model, t_test.shape, f_test.shape, duration_test, 'beta_AA') 
+    """
+
 
     # For feature distribution for trainer after adaptation
     for subject in setting.subject_list:
