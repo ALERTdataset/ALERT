@@ -278,11 +278,12 @@ Example Python code:
 
 If you use the ALERT dataset or this code in your research, please cite our paper.
 
-    @article{alertdataset2025,
-    title={ALERT Dataset and Input-Size-Agnostic Vision Transformer for Radar-Based Driver Activity Recognition},
-    author={...},
-    journal={Proceedings of the ACM on Interactive, Mobile, Wearable and Ubiquitous Technologies (IMWUT)},
-    year={2025}
+    @article{park2026alert,
+    title={ALERT Open Dataset and Input-Size-Agnostic Vision Transformer for Driver Activity Recognition using IR-UWB},
+    author={Park, Jeongjun and Hwang, Sunwook and Noh, Hyeonho and Yang, Jin Mo and Yang, Hyun Jong and Bahk, Saewoong},
+    journal={IEEE Access},
+    year={2026},
+    publisher={IEEE}
     }
 
 ---
