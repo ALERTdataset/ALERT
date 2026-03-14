@@ -78,7 +78,7 @@ After downloading, organize the dataset as follows:
     │   ├ p1_drive_1_f.csv
     │   └ ...
     │
-    └ makeDataset.py
+    └ ALERT_makeDataset.py
 
 Each activity recording contains:
 
@@ -93,7 +93,7 @@ Example workflow:
 
     git clone https://github.com/ALERTdataset/ALERT.git
     cd ALERT
-    python3 makeDataset.py common cropO 500
+    python3 ALERT_makeDataset.py common cropO 500
 
 Generated datasets will appear in:
 
@@ -107,11 +107,11 @@ The script converts raw radar CSV files into pickle datasets used for training a
 
 Usage:
 
-    python3 makeDataset.py [dataset_mode] [crop_mode] [sample_size]
+    python3 ALERT_makeDataset.py [dataset_mode] [crop_mode] [sample_size]
 
 Example:
 
-    python3 makeDataset.py common cropO 500
+    python3 ALERT_makeDataset.py common cropO 500
 
 Arguments:
 
