@@ -31,18 +31,18 @@ To address these challenges, we introduce the **ALERT Dataset** and the **Input-
 The ALERT dataset contains:
 
 - **10,220 radar samples**
-- **7 driver activities**
-- collected in **real driving conditions**
+- **7 driving activities**
+- Collected in **real driving conditions**
 
 Activities included in the dataset:
 
-- relax  
-- drive  
-- nod  
-- drink  
-- phone  
-- smoke  
-- panel
+- Relax  
+- Drive  
+- Nod  
+- Drink  
+- Phone  
+- Smoke  
+- Panel
 
 ## ISA-ViT
 
@@ -50,10 +50,10 @@ ISA-ViT is a framework designed to adapt radar inputs for Vision Transformer arc
 
 Key ideas include:
 
-- resizing radar inputs while preserving radar-specific information such as Doppler and phase data
-- adjusting patch embeddings to support flexible input sizes
-- leveraging pretrained positional embedding vectors (PEVs)
-- combining **range-domain and frequency-domain features** through domain fusion
+- Resizing radar inputs while preserving radar-specific information such as Doppler and phase data
+- Adjusting patch embeddings to support flexible input sizes
+- Leveraging pretrained positional embedding vectors (PEVs)
+- Combining **range-domain and frequency-domain features** through domain fusion
 
 Our experiments show that **ISA-ViT improves accuracy by 22.68% compared to existing ViT-based approaches** for radar-based DAR.
 
