@@ -15,9 +15,9 @@ Distracted driving contributes to fatal crashes worldwide. To address this probl
 
 Compared to camera-based systems, radar provides several advantages:
 
-- strong interference resistance  
-- low power consumption  
-- privacy preservation (no visual images)
+- Strong interference resistance  
+- Low power consumption  
+- Privacy preservation (no visual images)
 
 However, two challenges limit the adoption of radar-based DAR:
 
