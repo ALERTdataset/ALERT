@@ -165,49 +165,53 @@ This increases training samples while preserving temporal continuity.
 
 # Preprocessing Modes
 
-The dataset generation script supports several preprocessing configurations.
+Several preprocessing configurations are provided to generate different radar representations.  
+These options are intended as **reference implementations**, and users may modify or extend them depending on their research objectives.
 
 ## cropO
 
-Standard cropping configuration used in the paper.
+`cropO` extracts the radar data region where **multipath fading effects are mainly observed**.
 
-    time domain  : rangebin_start ~ rangebin_end
-    frequency    : 0 ~ 89
+This region typically contains strong reflections from the driver and surrounding environment, making it useful for capturing meaningful motion patterns related to driver activities.
 
 ---
 
 ## cropX
 
-Alternative cropping configuration.
+`cropX` uses the **entire radar data region without cropping**.
 
-    time domain  : rangebin_start ~ rangebin_end
-    frequency    : 45 ~ 89
+This configuration preserves all available radar information and allows researchers to explore models that learn directly from the full signal space.
 
 ---
 
 ## CA (Center Alignment)
 
-Automatically detects the **center activity (CA)** location in the radar signal.
+`CA` focuses on the region corresponding to the **driver's body location**.
 
-Cropping window:
-
-    time domain : (CA − 10) ~ (CA + 5)
+This preprocessing method crops a localized area around the driver's body to emphasize movements associated with driver activities such as drinking, using a phone, or interacting with the dashboard.
 
 ---
 
 ## CA_fft
 
-Same as CA but applies **FFT transformation** to the cropped time-domain signal.
+`CA_fft` applies a transformation to the **CA-cropped data** to represent it in a **range–Doppler format**.
+
+This representation captures motion-related information by highlighting velocity components associated with driver movements.
 
 ---
 
-## RD (Range-Doppler)
+## RD (Range–Doppler)
 
-Generates **range-doppler features** using:
+`RD` converts the radar signal into a **range–Doppler representation** directly from the original radar data.
 
-1. signal cropping  
-2. FFT transformation  
-3. range-doppler representation  
+This representation is commonly used in radar signal processing to analyze motion dynamics and velocity patterns.
+
+---
+
+### Note
+
+These preprocessing configurations are provided as **example pipelines used in our experiments**.  
+Researchers are encouraged to **modify the preprocessing strategy according to their own experimental needs and model architectures**.
 
 ---
 
@@ -247,14 +251,44 @@ Example Python code:
 
     import pickle
 
-    with open('cropO_p1_500_7_time_data.pickle','rb') as f:
-        time_data = pickle.load(f)
+    time_test = []
+    freq_test = []
+    labels_test = []
+    tmp = []
+    time_adapt =[]
+    freq_adapt =[]
+    labels_adapt =[]
+    
+    with open('./pickles/'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(setting.num_classes)+'_time_data.pickle', 'rb') as f:
+        tmp = pickle.load(f)
+    for label_idx in range(len(tmp)):
+        time_adapt += tmp[label_idx][:N_shot]
+        time_test += tmp[label_idx][50:]
+    with open('./pickles/'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(setting.num_classes)+'_freq_data.pickle', 'rb') as f:
+        tmp = pickle.load(f)
+    for label_idx in range(len(tmp)):
+        freq_adapt += tmp[label_idx][:N_shot]
+        freq_test += tmp[label_idx][50:]
+    with open('./pickles/'+crop+'_'+tester+'_'+str(sample_size)+'_'+str(setting.num_classes)+'_labels_data.pickle', 'rb') as f:
+        tmp = pickle.load(f)
+    for label_idx in range(len(tmp)):
+        labels_adapt += tmp[label_idx][:N_shot]
+        labels_test += tmp[label_idx][50:]
+    
+    time_adapt = torch.tensor(np.array(time_adapt))
+    freq_adapt = torch.tensor(np.array(freq_adapt))
+    labels_adapt = torch.tensor(np.array(labels_adapt))
+    
+    time_test = torch.tensor(np.array(time_test))
+    freq_test = torch.tensor(np.array(freq_test))
+    labels_test = torch.tensor(np.array(labels_test))   
+    
+    adapt_dataset = torch.utils.data.TensorDataset(time_adapt, freq_adapt, labels_adapt)
+    adapt_dataloader = DataLoader(adapt_dataset, batch_size=5, shuffle=True)
 
-    with open('cropO_p1_500_7_freq_data.pickle','rb') as f:
-        freq_data = pickle.load(f)
-
-    with open('cropO_p1_500_7_labels_data.pickle','rb') as f:
-        labels = pickle.load(f)
+    test_dataset = torch.utils.data.TensorDataset(time_test, freq_test, labels_test)
+    test_dataloader = DataLoader(test_dataset, batch_size=25, shuffle=False)
+    
 
 ---
 
@@ -303,7 +337,3 @@ The authors and contributors:
 Users are responsible for ensuring compliance with applicable laws and regulations when using the dataset.
 
 ---
-
-# Contact
-
-For questions regarding the dataset or code, please contact the repository maintainers via GitHub issues.
